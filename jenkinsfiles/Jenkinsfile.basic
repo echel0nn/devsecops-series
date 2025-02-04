@@ -1,0 +1,75 @@
+pipeline {
+    agent any
+    environment {
+        GITLAB_URL = 'ssh://git@10.43.196.8:2222/root/dvja.git' // Replace with the gitlab IP
+	DOCKER_IMAGE = 'dvja-app' 
+        DOCKER_TAG = 'latest'
+        NEXUS_REPO = 'nexus.local:4502/repository'
+        KUBERNETES_HOST = '10.42.0.1'  // Replace with your Kubernetes host. Check /etc/hosts if you have used scripts/change_hosts_file.sh
+    }
+    tools {
+        dockerTool 'docker'
+    }
+    stages {
+        stage('Clone Repository') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    doGenerateSubmoduleConfigurations: false,
+                    extensions: [],
+                    submoduleCfg: [],
+                    userRemoteConfigs: [[
+                        url: env.GITLAB_URL,
+                        credentialsId: 'GIT_PASS'
+                    ]]
+                ])
+            }
+        }
+        stage('Build') {
+            steps {
+                sh '/var/jenkins_home/maven/apache-maven-4.0.0-beta-4/bin/mvn clean package -DskipTests'
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                sh """
+                docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                """
+            }
+        }
+        stage('Push Docker Image to Nexus') {
+            steps {
+                script {
+                    sh """
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${NEXUS_REPO}/${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker login ${NEXUS_REPO} -u admin -p 'wowsuchchar8!' 
+                    docker push ${NEXUS_REPO}/${DOCKER_IMAGE}:${DOCKER_TAG}
+                    """
+                }
+            }
+        }
+        stage('Deploy to Kubernetes') {
+            steps {
+                sshagent(credentials: ['SSH_LOGIN_HOST']) {
+                    sh """
+                    scp -o StrictHostKeyChecking=no k8s/deployment.yaml root@${KUBERNETES_HOST}:/tmp/deployment.yaml  
+                    ssh -o StrictHostKeyChecking=no root@${KUBERNETES_HOST} 'k3s kubectl apply -f /tmp/deployment.yaml'
+                    """
+                }
+            }
+        }
+    }
+    post {
+        always {
+            echo 'Cleaning up...'
+            sh 'docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true'
+        }
+        success {
+            echo 'Pipeline executed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}

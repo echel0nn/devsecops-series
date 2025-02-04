@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dvja-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dvja-app
+  template:
+    metadata:
+      labels:
+        app: dvja-app
+    spec:
+      containers:
+      - name: dvja-app
+        image: nexus.local:4502/repository/dvja-app:latest
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+      imagePullSecrets:
+      - name: nexus-pass
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dvja-app-service
+spec:
+  selector:
+    app: dvja-app
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
