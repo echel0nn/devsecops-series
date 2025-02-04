@@ -51,26 +51,26 @@ taken if you break something, you warned...
 
 ### The Most Probable Problems:
 
-* -> `/var/run/docker.sock` must be there all operations before, start your docker daemon first!
+* `/var/run/docker.sock` must be there all operations before, start your docker daemon first!
 
-* VULNERABLE ADVICE: you can also run `sudo chmod 777 /var/run/docker.sock` to work without root.
+    * VULNERABLE ADVICE: you can also run `sudo chmod 777 /var/run/docker.sock` to work without root.
 
-* BETTER: add yourself to docker group to work with daemon. 
+    * BETTER: add yourself to docker group to work with daemon. 
 
-* -> HTTP response for HTTPS service 
+* HTTP response for HTTPS service 
 
 You have to define insecure-registries both in `/etc/rancher/k3s/registries.yaml` and `/etc/docker/daemon.json` 
 Check your nexus.local entry `/etc/hosts` and refresh it with change_hosts_file.sh (you can delete /etc/hosts if needed) 
 
-* -> Domains in jenkins steps 
+* Domains in jenkins steps 
 Domains are just for requests from docker.sock and yourself, `/etc/hosts` rows are not valid for the pods, watch out. 
 
-* -> If you are in doubt just erase all of them and start again:
+* If you are in doubt just erase all of them and start again:
 	`$ sudo k3s kubectl delete -f base_yamls/` 
 
-* -> Jenkins Plugins are important, check again if something is broken or not found.
+* Jenkins Plugins are important, check again if something is broken or not found.
 
-* -> Check your credentials if they are saved correctly
+*  Check your credentials if they are saved correctly
 
 Used Credentials;
 
@@ -79,7 +79,7 @@ Used Credentials;
 	3) One user:passwd for the nexus login (Jenkins)
 	4) One nexus kubectl secret docker-registry, configured from the CLI 
 
-* -> Check Jenkins Plugins
+* Check Jenkins Plugins
 
     1) Docker API Plugin 
     2) Docker Commons Plugin 
@@ -91,17 +91,19 @@ Used Credentials;
     8) Pipeline Maven Plugin API 
     10) SSH Agent 
 
-* -> Delete the deployed DVJA before new build: 
+* Delete the deployed DVJA before new build: 
 
 	`$ sudo k3s kubectl delete -f /tmp/deployment.yaml # from your host machine` 
 
-* -> If something is broken, and you would like to setup it again you can seperately delete them too!
+* If something is broken, and you would like to setup it again you can seperately delete them too!
 
+```
 	$ sudo k3s kubectl delete -f base_yamls/nexus-deployment.yaml  
 	$ sudo k3s kubectl delete -f base_yamls/nexus-data-persistentvolumeclaim.yaml  
 	$ sudo k3s kubectl delete -f base_yamls/nexus-service.yaml  
+```
 
-* -> You cant commit something or pull:
+* You cant commit something or pull:
 
 Just edit `~/.ssh/config`:
 
@@ -111,8 +113,8 @@ Host gitlab.local
 	Port 2222
 	User git
 ```
-* -> NOTE: add `yamls/app/deployment.yaml` file into local dvja's repository.
-* -> add the `nexus_pass` secret to login nexus from the host itself.
+* Add `yamls/app/deployment.yaml` file into local dvja's repository.
+* Also add the `nexus_pass` secret to login nexus from the host itself.
 
     `$ sudo k3s kubectl create secret docker-registry nexus_pass --docker-server=nexus.local:8082 --docker-username=admin --docker-password='wowsuchchar8!'`
 
