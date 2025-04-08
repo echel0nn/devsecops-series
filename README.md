@@ -45,7 +45,7 @@ taken if you break something, you warned...
 
 1) [DevSecOps Series I  - Introduction](https://devilinside.me/blogs/devsecops-series-introduction)
 2) [DevSecOps Series II - the Simple DevOps Environment](https://devilinside.me/blogs/devsecops-series-simple-pipeline)
-
+3) [DevSecOps Series III - SAST](https://devilinside.me/blogs/devsecops-series-simple-pipeline)
 
 ## Basic Troubleshooting
 
