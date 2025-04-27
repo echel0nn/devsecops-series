@@ -1,0 +1,90 @@
+{
+  "path": "",
+  // suport ext: html/json/xml/csv/sqlite/cdx/spdx/swid/dsdx
+  "out": "opensca-results.html",
+
+  "log": "opensca-results.log",
+
+  "optional": {
+
+    // open ui
+    "ui": false,
+
+    // delete duplicate components and merge path
+    "dedup": true,
+
+    // only detect directory (skip compress file)
+    "dir": false,
+
+    // only save components with vulnerability
+    "vuln": false,
+
+    // open progress bar
+    "progress": false,
+
+    // save develop components
+    "dev": true,
+
+    // use tls verify, default: false
+    "tls": false,
+
+    // global proxy for http requests, eg: http://127.0.0.1:7890
+    "proxy": ""
+
+  },
+
+  // repo config
+  "repo": {
+
+    // maven repo
+    "maven": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/"
+      }
+    ],
+
+    // npm repo
+    "npm": [
+      {
+        "url": "https://registry.npmmirror.com"
+      }
+    ],
+
+    // composer repo
+    "composer": [
+      {
+        "url":"https://mirrors.aliyun.com/composer/p2"
+      }
+    ]
+
+  },
+
+  // database origin
+  "origin": {
+
+    // opensca web service url
+    "url": "https://opensca.xmirror.cn",
+    // opensca web service token
+    "token": "",
+    // opensca saas project id, not required
+    // "proj": "",
+
+    // json dbfile
+    "json": "",
+
+    // mysql origin
+    "mysql": {
+      // user:password@tcp(ip:port)/dbname
+      "dsn": "",
+      "table": ""
+    },
+
+    // sqlite origin
+    "sqlite": {
+      // sqlite dbfile
+      "dsn": "",
+      "table": ""
+    }
+
+  }
+}
