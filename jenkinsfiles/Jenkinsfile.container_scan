@@ -1,0 +1,151 @@
+pipeline {
+    agent any
+    environment {
+        GITLAB_URL = 'ssh://git@10.43.42.5:2222/root/dvja.git' // Replace with the gitlab IP
+        DOCKER_IMAGE = 'dvja-app' 
+        DOCKER_TAG = 'latest'
+        NEXUS_REPO = 'nexus.local:4502/repository'
+        KUBERNETES_HOST = '10.42.0.1'  // Replace with your Kubernetes host
+        DEPLOYED_URL = "http://10.43.49.178:8080/" // replace with the service's IP
+    }
+    tools {
+        dockerTool 'docker'
+    }
+    stages {
+        stage('Clone Repository') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    doGenerateSubmoduleConfigurations: false,
+                    extensions: [],
+                    submoduleCfg: [],
+                    userRemoteConfigs: [[
+                        url: env.GITLAB_URL,
+                        credentialsId: 'GIT_PASS'
+                    ]]
+                ])
+            }
+        }
+        stage('Build') {
+            steps {
+                sh '/var/jenkins_home/maven/apache-maven-4.0.0-beta-4/bin/mvn clean package -DskipTests'
+            }
+        }
+        stage('SonarQube analysis') {
+            steps {
+                withSonarQubeEnv(credentialsId: "SONARQUBE_TOKEN", installationName: 'SonarQube') { // You can override the credential to be used, If you have configured more than one global server connection, you can specify the corresponding SonarQube installation name configured in Jenkins
+                  sh '/var/jenkins_home/maven/apache-maven-4.0.0-beta-4/bin/mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar'
+                }
+            }
+        }
+	stage('OpenSCA Analysis') {
+	    steps {
+		script {
+		    sshagent(credentials: ['SSH_LOGIN_HOST']) {
+		      sh """
+		      echo "Starting OpenSCA scan...";
+                      scp -o StrictHostKeyChecking=no opensca-config.json root@${KUBERNETES_HOST}:/tmp/opensca-config.json;
+                      scp -o StrictHostKeyChecking=no pom.xml root@${KUBERNETES_HOST}:/tmp/pom.xml;
+		      docker run -t --rm -v /tmp/:/src opensca/opensca-cli -config /src/opensca-config.json
+              	      scp -o StrictHostKeyChecking=no root@${KUBERNETES_HOST}:/tmp/opensca-results.html opensca-results.html
+		      echo "OpenSCA scan finished.";
+		       """
+		    }
+	    }
+		archiveArtifacts artifacts: 'opensca-results.html', fingerprint: true
+
+	    }
+	}
+        stage('Build Docker Image') {
+            steps {
+                sh """
+                docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                """
+            }
+        }
+        stage('Push Docker Image to Nexus') {
+            steps {
+                script {
+                    sh """
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${NEXUS_REPO}/${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker login ${NEXUS_REPO} -u admin -p 'wowsuchchar8!'
+                    docker push ${NEXUS_REPO}/${DOCKER_IMAGE}:${DOCKER_TAG}
+                    """
+                }
+            }
+        }
+	stage('Image Security Scan') {
+	  steps {
+	    sshagent(credentials: ['SSH_LOGIN_HOST']) {
+	      sh """
+		echo "Starting Trivy scan on remote host...";
+		ssh -o StrictHostKeyChecking=no root@${KUBERNETES_HOST} '
+		  docker login ${NEXUS_REPO} -u admin -p 'wowsuchchar8!' &&
+		  trivy image nexus.local:4502/repository/${DOCKER_IMAGE}:${DOCKER_TAG} \
+		  --format table > /tmp/trivy-scan.txt &&
+		  echo "<html><head><title>Trivy Report</title></head><body><pre>" > /tmp/trivy-output.html &&
+		  cat /tmp/trivy-scan.txt >> /tmp/trivy-output.html &&
+		  echo "</pre></body></html>" >> /tmp/trivy-output.html && sleep 5;
+		'
+
+		echo "Fetching Trivy HTML report from remote host..."
+		scp -o StrictHostKeyChecking=no root@${KUBERNETES_HOST}:/tmp/trivy-output.html trivy-output.html
+	      """
+	    }
+
+	    // Archive the report in Jenkins
+	    archiveArtifacts artifacts: 'trivy-output.html', fingerprint: true
+	  }
+	}
+        stage('Deploy to Kubernetes') {
+            steps {
+                sshagent(credentials: ['SSH_LOGIN_HOST']) {
+                    sh """
+                    scp -o StrictHostKeyChecking=no k8s/deployment.yaml root@${KUBERNETES_HOST}:/tmp/deployment.yaml
+                    ssh -o StrictHostKeyChecking=no root@${KUBERNETES_HOST} 'k3s kubectl apply -f /tmp/deployment.yaml'
+                    """
+                }
+            }
+        }
+        stage('Run ZAP Scan via SSH') {
+          steps {
+            sshagent(credentials: ['SSH_LOGIN_HOST']) {
+              sh """
+              echo "Starting ZAP scan...";
+                ssh -o StrictHostKeyChecking=no root@${KUBERNETES_HOST} '
+                  docker run --rm -v /tmp:/zap/wrk:rw softwaresecurityproject/zap-stable zap-baseline.py \
+                    -t ${DEPLOYED_URL} \
+                    -r zap-report.html;sleep 5;
+                '
+                echo "ZAP scan finished.";
+               """
+            }
+          }
+        }
+    
+        stage('OWASP ZAP Archive Report') {
+          steps {
+            sshagent(credentials: ['SSH_LOGIN_HOST']) {
+              sh """
+              scp -o StrictHostKeyChecking=no root@${KUBERNETES_HOST}:/tmp/zap-report.html zap-report.html
+            """
+            archiveArtifacts artifacts: 'zap-report.html', fingerprint: true
+            }
+          }
+        }
+    }
+    post {
+        always {
+            echo 'Cleaning up...'
+            sh 'docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true'
+        }
+        success {
+            echo 'Pipeline executed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
+
