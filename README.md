@@ -48,6 +48,8 @@ taken if you break something, you warned...
 3) [DevSecOps Series III - SAST](https://devilinside.me/blogs/devsecops-series-iii-sast)
 4) [DevSecOps Series IV - DAST](https://devilinside.me/blogs/devsecops-series-iv-dast)
 5) [DevSecOps Series V - SCA](https://devilinside.me/blogs/devsecops-series-v-sca)
+6) [DevSecOps Series VI - Container Security Scan](https://devilinside.me/blogs/devsecops-series-vi-container-security-scan)
+   
 ## Basic Troubleshooting
 
 ### The Most Probable Problems:
